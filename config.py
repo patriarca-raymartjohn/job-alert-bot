@@ -8,16 +8,31 @@ import os
 # Each entry is a search term sent to a job platform's keyword search.
 # Variants/synonyms are included so we don't miss differently-worded posts.
 DEFAULT_KEYWORDS = [
-    "sql",
-    "power bi",
-    "tester",
+    # Data / BI roles & skills
     "data analyst",
     "data engineer",
+    "data analytics",
     "bi developer",
     "business intelligence",
-    "data analytics",
+    "power bi",
+    "sql",
     "etl",
+    "data entry",
+    # QA / testing
+    "tester",
+    "qa",
     "qa engineer",
+    "manual tester",
+    "manual testing",
+    "software qa testing",
+    "quality assurance",
+    # AI tools
+    "ai tools",
+    "claude",
+    "claude code",
+    "chatgpt",
+    "codex",
+    "base44",
 ]
 
 
