@@ -87,7 +87,7 @@ class OnlineJobsPHScraper(BaseScraper):
                     job_type=job_type,
                     description=description,
                     tags=tags,
-                    matched_keyword=keyword,
+                    matched_keywords=[keyword],
                 )
             )
 

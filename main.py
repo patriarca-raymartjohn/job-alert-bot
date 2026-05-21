@@ -21,9 +21,15 @@ DRY_RUN = os.environ.get("DRY_RUN", "").strip() in ("1", "true", "True")
 
 
 def collect_jobs() -> list[Job]:
-    """Scrape all platforms × keywords, deduping within this run by uid."""
+    """Scrape all platforms × keywords, deduping within this run by uid.
+
+    A job surfaced by several keyword searches keeps ALL of them in
+    matched_keywords. We then also flag any configured keyword that
+    literally appears in the job's text, so each alert shows every
+    keyword it actually matches (in config order).
+    """
     keywords = config.get_keywords()
-    seen_this_run: set[str] = set()
+    by_uid: dict[str, Job] = {}
     collected: list[Job] = []
 
     for scraper_cls in ENABLED_SCRAPERS:
@@ -36,13 +42,32 @@ def collect_jobs() -> list[Job]:
                 continue
             new = 0
             for job in results:
-                if job.uid in seen_this_run:
+                existing = by_uid.get(job.uid)
+                if existing is not None:
+                    # Same job from another keyword search: merge the keyword.
+                    for k in job.matched_keywords:
+                        if k not in existing.matched_keywords:
+                            existing.matched_keywords.append(k)
                     continue
-                seen_this_run.add(job.uid)
+                by_uid[job.uid] = job
                 collected.append(job)
                 new += 1
             print(f"  {scraper_cls.source} '{kw}': {len(results)} found, "
-                  f"{new} unique this run")
+                  f"{new} new this run")
+
+    # Enrich each job's matched list with any configured keyword that appears
+    # in its title/description/tags, then order by the config keyword order.
+    for job in collected:
+        text = f"{job.title} {job.description} {' '.join(job.tags)}".lower()
+        ordered = [
+            kw for kw in keywords
+            if kw in job.matched_keywords or kw.lower() in text
+        ]
+        for kw in job.matched_keywords:  # keep any non-config surfacing keyword
+            if kw not in ordered:
+                ordered.append(kw)
+        job.matched_keywords = ordered
+
     return collected
 
 
@@ -58,20 +83,20 @@ def main() -> int:
         print("Nothing new. Done.")
         return 0
 
+    # Throttle (don't drop): send at most `cap` this run; the rest stay
+    # UNSEEN so the next run(s) deliver them. The backlog drains over time
+    # and nothing matching is silently lost.
     cap = config.MAX_NOTIFICATIONS_PER_RUN
-    to_notify = fresh
-    silent: list[Job] = []
-    if cap and len(fresh) > cap:
-        # Newest first so the cap keeps the most relevant alerts.
-        to_notify = fresh[:cap]
-        silent = fresh[cap:]
-        print(f"Capping notifications at {cap}; "
-              f"{len(silent)} older jobs recorded silently.")
+    to_notify = fresh[:cap] if cap else fresh
+    deferred = len(fresh) - len(to_notify)
+    if deferred:
+        print(f"Throttling: sending {len(to_notify)} now; "
+              f"{deferred} kept unseen for the next run(s).")
 
     if DRY_RUN:
         print("\n[DRY_RUN] Would notify about:")
         for j in to_notify:
-            print(f"  - [{j.matched_keyword}] {j.title} ({j.url})")
+            print(f"  - [{', '.join(j.matched_keywords)}] {j.title} ({j.url})")
         return 0
 
     sent = 0
@@ -88,13 +113,10 @@ def main() -> int:
         print(f"FATAL: {exc}")
         return 2
 
-    # Jobs intentionally not notified (over the cap) are still recorded
-    # so they never trigger a late alert.
-    for job in silent:
-        state.mark_seen(st, job.uid)
-
     state.save_seen(st)
-    print(f"Sent {sent} alert(s). State saved ({len(st['seen'])} known jobs).")
+    deferred_note = f" ({deferred} queued for next run)" if deferred else ""
+    print(f"Sent {sent} alert(s){deferred_note}. "
+          f"State saved ({len(st['seen'])} known jobs).")
     return 0
 
 

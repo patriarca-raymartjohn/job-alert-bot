@@ -34,7 +34,7 @@ class Job:
     job_type: str = ""   # Full Time / Part Time / ...
     description: str = ""
     tags: list[str] = field(default_factory=list)
-    matched_keyword: str = ""
+    matched_keywords: list[str] = field(default_factory=list)
 
     @property
     def uid(self) -> str:

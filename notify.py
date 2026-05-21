@@ -51,9 +51,8 @@ def format_job(job: Job) -> str:
             desc += "…"
         lines.append(e(desc))
     lines.append(f"\U0001f517 <a href=\"{e(job.url)}\">View job</a>")
-    lines.append(
-        f"<i>{e(job.source)} — matched: {e(job.matched_keyword)}</i>"
-    )
+    matched = ", ".join(job.matched_keywords) if job.matched_keywords else "—"
+    lines.append(f"<i>{e(job.source)} — matched: {e(matched)}</i>")
     return "\n".join(lines)
 
 
