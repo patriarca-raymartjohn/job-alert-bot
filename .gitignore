@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.tmp
+.venv/
+venv/
+.env
+/tmp/
+
+# Personal data — never commit (contains PII)
+RAYMART-PROFILE.md
